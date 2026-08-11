@@ -28,10 +28,15 @@ export default function AppRoutes() {
         element={<SuperAdminDashboard />}
       />
 
-      <Route
-        path="/admin/dashboard"
-        element={<TeacherDashboard />}
-      />
+     <Route
+  path="/admin/dashboard"
+  element={<TeacherDashboard />}
+/>
+
+<Route
+  path="/teacher/dashboard"
+  element={<TeacherDashboard />}
+/>
 
       {/* Live Attendance - MUST COME BEFORE /attendance/:token */}
       <Route

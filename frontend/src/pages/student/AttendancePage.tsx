@@ -281,11 +281,25 @@ export default function AttendancePage() {
                     body: JSON.stringify({ image }),
                   });
                   const spoof = await spoofRes.json();
-                  if (!spoof.real) {
-                    setCameraError("Fake face or photo spoof detected!");
-                    setShowCamera(false);
-                    return;
-                  }
+
+console.log("========== ANTI SPOOF FRONTEND ==========");
+console.log("HTTP Status:", spoofRes.status);
+console.log("Spoof Response:", spoof);
+console.log("==========================================");
+
+if (!spoofRes.ok || spoof.success !== true) {
+  setCameraError(
+    spoof.message || "Anti-spoof verification failed. Please try again."
+  );
+  setShowCamera(false);
+  return;
+}
+
+if (spoof.real !== true) {
+  setCameraError("Fake face or photo spoof detected!");
+  setShowCamera(false);
+  return;
+}
                   if (!registered) {
                     await registerFace(image, descriptor);
                   } else {
