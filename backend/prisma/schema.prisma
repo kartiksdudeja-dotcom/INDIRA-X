@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String              @id @default(uuid())
+  name           String
+  email          String              @unique
+  password       String
+  role           Role
+  status         AccountStatus       @default(PENDING)
+  college        String?
+  department     String?
+  course         String?
+  semester       String?
+  division       String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  faceImage      String?
+  faceDescriptor String?
+  attendance     Attendance[]
+  sessions       AttendanceSession[]
+}
+
+model Subject {
+  id         String              @id @default(uuid())
+  name       String
+  semester   String
+  college    String
+  department String
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  sessions   AttendanceSession[]
+}
+
+model ClassModel {
+  id         String              @id @default(uuid())
+  name       String
+  college    String
+  department String
+  semester   String
+  division   String
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  sessions   AttendanceSession[]
+}
+
+model AttendanceSession {
+  id               String        @id @default(uuid())
+  college          String
+  course           String
+  semester         String
+  subjectId        String
+  division         String
+  teacherId        String
+  classId          String
+  qrToken          String        @unique
+  expiresAt        DateTime
+  createdAt        DateTime      @default(now())
+  endedAt          DateTime?
+  startedAt        DateTime      @default(now())
+  status           SessionStatus @default(ACTIVE)
+  allowedRadius    Int           @default(100)
+  collegeLatitude  Float?
+  collegeLongitude Float?
+  attendance       Attendance[]
+  classModel       ClassModel    @relation(fields: [classId], references: [id])
+  subject          Subject       @relation(fields: [subjectId], references: [id])
+  teacher          User          @relation(fields: [teacherId], references: [id])
+
+  @@index([qrToken])
+  @@index([teacherId])
+  @@index([status])
+}
+
+model Attendance {
+  id           String            @id @default(uuid())
+  studentId    String
+  sessionId    String
+  status       AttendanceStatus  @default(PRESENT)
+  createdAt    DateTime          @default(now())
+  faceVerified Boolean           @default(false)
+  latitude     Float?
+  longitude    Float?
+  session      AttendanceSession @relation(fields: [sessionId], references: [id])
+  student      User              @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, sessionId])
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  STUDENT
+}
+
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+enum SessionStatus {
+  ACTIVE
+  ENDED
+  EXPIRED
+}

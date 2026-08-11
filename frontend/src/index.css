@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #800000;
+  --color-secondary: #002147;
+  --color-bg: #f8f9ff;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Default body – keeps student/teacher pages working */
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Only the student/non-admin pages keep the original gradient */
+body.page-student {
+  background: linear-gradient(135deg, #111827, #1d4ed8);
+  color: white;
+  color-scheme: dark;
+}
+
+/* Super Admin shell uses the Stitch light surface */
+body.page-super-admin {
+  background-color: var(--color-bg);
+  color: #0b1c30;
+  color-scheme: light;
+}
+
+/* Smooth scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar { width: 5px; height: 5px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 9999px; }
+
+/* Tailwind group-hover fix for bg opacity */
+.hover\:bg-white\/8:hover { background-color: rgba(255,255,255,0.08); }
