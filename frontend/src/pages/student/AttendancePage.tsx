@@ -62,12 +62,178 @@ export default function AttendancePage() {
   const loadSession = async () => {
     try {
       const res = await fetch(`${API}/session/${token}`);
+      console.log("Session HTTP Status:", res.status);
       const data = await res.json();
-      if (data.success) setSession(data.session);
-      else alert(data.message);
-    } catch { alert("Unable to load attendance session"); }
-    finally { setLoading(false); }
+      console.log("Session Response:", data);
+      
+      if (data.success) {
+        setSession(data.session);
+      } else {
+        setCameraError(data.message || "Unable to load attendance session.");
+      }
+    } catch (err) {
+      console.error("❌ SESSION LOAD ERROR:", err);
+      setCameraError(err instanceof Error ? err.message : "Unable to load attendance session.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const markAttendance = async (
+  faceImage: string,
+  faceDescriptor: number[]
+) => {
+  if (marking) return;
+
+  setMarking(true);
+  setCameraError("");
+
+  try {
+    const tokenData = localStorage.getItem("token");
+    const student = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
+    console.log("========== MARK ATTENDANCE START ==========");
+
+    console.log("Student ID:", student.id);
+    console.log("Student Name:", student.name);
+    console.log("Student Role:", student.role);
+    console.log("Session ID:", session?.id);
+    console.log("Token exists:", !!tokenData);
+    console.log("Face Descriptor exists:", !!faceDescriptor);
+    console.log("Face Image Length:", faceImage?.length);
+
+    if (
+      !tokenData ||
+      !student.id ||
+      student.role !== "STUDENT"
+    ) {
+      console.error("❌ Authentication information missing");
+
+      navigate(`/student/login?token=${token}`);
+      return;
+    }
+
+    // ==========================================
+    // GET LOCATION
+    // ==========================================
+
+    console.log("📍 Getting location...");
+
+    const position = await getLocation();
+
+    const latitude = position.coords.latitude;
+    const longitude = position.coords.longitude;
+
+    console.log("✅ Location received");
+    console.log("Latitude:", latitude);
+    console.log("Longitude:", longitude);
+
+    // ==========================================
+    // MARK ATTENDANCE
+    // ==========================================
+
+    const attendanceUrl = `${API}/mark`;
+
+    console.log("🌐 Attendance URL:", attendanceUrl);
+
+    const requestBody = {
+      studentId: student.id,
+      studentName: student.name,
+      sessionId: session?.id,
+      latitude,
+      longitude,
+      faceImage,
+      faceDescriptor,
+    };
+
+    console.log("📤 Sending attendance request");
+    console.log("Request:", {
+      studentId: student.id,
+      studentName: student.name,
+      sessionId: session?.id,
+      latitude,
+      longitude,
+      faceImageLength: faceImage?.length,
+      faceDescriptorLength: faceDescriptor?.length,
+    });
+
+    const res = await fetch(attendanceUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokenData}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("📥 Attendance HTTP Status:", res.status);
+
+    const responseText = await res.text();
+
+    console.log(
+      "📥 Attendance Raw Response:",
+      responseText
+    );
+
+    let data: any;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      throw new Error(
+        `Backend returned invalid JSON. HTTP ${res.status}: ${responseText}`
+      );
+    }
+
+    console.log("📥 Attendance Response:", data);
+
+    if (!res.ok) {
+      throw new Error(
+        data?.message ||
+        `Attendance request failed with HTTP ${res.status}`
+      );
+    }
+
+    if (data.success) {
+      console.log("✅ ATTENDANCE MARKED SUCCESSFULLY");
+
+      navigate("/attendance/success");
+      return;
+    }
+
+    throw new Error(
+      data?.message || "Attendance was not marked."
+    );
+
+  } catch (err) {
+
+    console.error(
+      "❌ MARK ATTENDANCE ERROR:",
+      err
+    );
+
+    const message =
+      err instanceof Error
+        ? err.message
+        : String(err);
+
+    setCameraError(message);
+
+    console.error(
+      "❌ Final attendance error:",
+      message
+    );
+
+  } finally {
+    setMarking(false);
+
+    console.log(
+      "========== MARK ATTENDANCE END =========="
+    );
+  }
+};
 
   const loadFaceStatus = async () => {
     try {
@@ -85,10 +251,53 @@ export default function AttendancePage() {
   };
 
   const getLocation = (): Promise<GeolocationPosition> =>
-    new Promise((resolve, reject) => {
-      if (!navigator.geolocation) { reject("Geolocation not supported"); return; }
-      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-    });
+  new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation is not supported by this browser."));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      (error) => {
+        console.error("❌ LOCATION ERROR:", error);
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            reject(
+              new Error(
+                "Location permission denied. Please allow location access."
+              )
+            );
+            break;
+
+          case error.POSITION_UNAVAILABLE:
+            reject(
+              new Error(
+                "Location is currently unavailable. Please try again."
+              )
+            );
+            break;
+
+          case error.TIMEOUT:
+            reject(
+              new Error(
+                "Location request timed out. Please enable GPS and try again."
+              )
+            );
+            break;
+
+          default:
+            reject(new Error("Unable to get your location."));
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  });
 
   const registerFace = async (image: string, descriptor: number[]) => {
     const tokenData = localStorage.getItem("token");
@@ -107,31 +316,7 @@ export default function AttendancePage() {
     } else { alert(data.message || "Face registration failed"); }
   };
 
-  const markAttendance = async (faceImage: string, faceDescriptor: number[]) => {
-    if (marking) return;
-    setMarking(true);
-    try {
-      const tokenData = localStorage.getItem("token");
-      const student = JSON.parse(localStorage.getItem("user") || "{}");
-      if (!tokenData || !student.id || student.role !== "STUDENT") {
-        navigate(`/student/login?token=${token}`); return;
-      }
-      const position = await getLocation();
-      const res = await fetch(`${API}/mark`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenData}` },
-        body: JSON.stringify({
-          studentId: student.id, studentName: student.name, sessionId: session?.id,
-          latitude: position.coords.latitude, longitude: position.coords.longitude,
-          faceImage, faceDescriptor,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) navigate("/attendance/success");
-      else alert(data.message);
-    } catch { alert("Unable to mark attendance."); }
-    finally { setMarking(false); }
-  };
+
 
   // ── Loading Screen ────────────────────────────────────────
   if (loading) {
@@ -275,31 +460,77 @@ export default function AttendancePage() {
                     setCameraError("Face not detected. Align your face clearly with the camera.");
                     return;
                   }
-                  const spoofRes = await fetch(`${import.meta.env.VITE_API_URL}/anti-spoof/check`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ image }),
-                  });
-                  const spoof = await spoofRes.json();
+                  const spoofRes = await fetch(
+  `${import.meta.env.VITE_API_URL}/anti-spoof/check`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ image }),
+  }
+);
 
-console.log("========== ANTI SPOOF FRONTEND ==========");
-console.log("HTTP Status:", spoofRes.status);
-console.log("Spoof Response:", spoof);
-console.log("==========================================");
+console.log(
+  "========== ANTI SPOOF FRONTEND =========="
+);
+
+console.log(
+  "Anti Spoof HTTP Status:",
+  spoofRes.status
+);
+
+const spoofText = await spoofRes.text();
+
+console.log(
+  "Anti Spoof Raw Response:",
+  spoofText
+);
+
+let spoof: any;
+
+try {
+  spoof = JSON.parse(spoofText);
+} catch {
+  throw new Error(
+    `Anti-spoof returned invalid response. HTTP ${spoofRes.status}`
+  );
+}
+
+console.log(
+  "Spoof Response:",
+  spoof
+);
+
+console.log(
+  "=========================================="
+);
 
 if (!spoofRes.ok || spoof.success !== true) {
   setCameraError(
-    spoof.message || "Anti-spoof verification failed. Please try again."
+    spoof.message ||
+    `Anti-spoof verification failed. HTTP ${spoofRes.status}`
   );
+
   setShowCamera(false);
   return;
 }
 
 if (spoof.real !== true) {
-  setCameraError("Fake face or photo spoof detected!");
+  setCameraError(
+    "Fake face or photo spoof detected!"
+  );
+
   setShowCamera(false);
   return;
 }
+
+console.log(
+  "✅ ANTI-SPOOF PASSED",
+  spoof.score
+);
+
+
                   if (!registered) {
                     await registerFace(image, descriptor);
                   } else {
