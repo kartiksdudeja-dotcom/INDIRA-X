@@ -1,21 +1,11 @@
-import base64
-import json
 import os
 import sys
-
-import cv2
-import numpy as np
-import torch
-
-
-# ============================================================
-# 1. Define base paths
-# ============================================================
 
 PYTHON_DIR = os.path.dirname(os.path.abspath(__file__))
 
 PROJECT_PATH = os.path.join(
     PYTHON_DIR,
+    "anti-spoof",
     "Silent-Face-Anti-Spoofing-master"
 )
 
@@ -25,30 +15,15 @@ MODEL_DIR = os.path.join(
     "anti_spoof_models"
 )
 
-
-print("Python directory:", PYTHON_DIR)
-print("Project path:", PROJECT_PATH)
-print("Model directory:", MODEL_DIR)
-
-
-# ============================================================
-# 2. Check paths
-# ============================================================
+print("PYTHON_DIR:", PYTHON_DIR)
+print("PROJECT_PATH:", PROJECT_PATH)
+print("MODEL_DIR:", MODEL_DIR)
 
 if not os.path.exists(PROJECT_PATH):
-    raise Exception(
-        f"Project path not found: {PROJECT_PATH}"
-    )
+    raise Exception(f"Project path not found: {PROJECT_PATH}")
 
 if not os.path.exists(MODEL_DIR):
-    raise Exception(
-        f"Model directory not found: {MODEL_DIR}"
-    )
-
-
-# ============================================================
-# 3. Append project path before local imports
-# ============================================================
+    raise Exception(f"Model directory not found: {MODEL_DIR}")
 
 sys.path.insert(0, PROJECT_PATH)
 
