@@ -1,74 +1,135 @@
 export const checkSpoof = async (
   image: string
 ): Promise<any> => {
-  try {
-    const pythonUrl = process.env.ANTI_SPOOF_URL;
 
-    if (!pythonUrl) {
-      throw new Error(
-        "ANTI_SPOOF_URL is not configured"
-      );
-    }
+  const pythonUrl = process.env.ANTI_SPOOF_URL;
 
-    console.log("===== ANTI SPOOF REQUEST =====");
-    console.log("Python Service:", pythonUrl);
-    console.log("Image exists:", !!image);
-    console.log("Image length:", image?.length);
+  if (!pythonUrl) {
+    throw new Error("ANTI_SPOOF_URL is not configured");
+  }
 
-    const response = await fetch(
-      `${pythonUrl}/anti-spoof`,
-      {
+  const url = `${pythonUrl.replace(/\/$/, "")}/anti-spoof`;
+
+  console.log("========== ANTI SPOOF REQUEST ==========");
+  console.log("Python URL:", url);
+  console.log("Image exists:", !!image);
+  console.log("Image length:", image?.length);
+
+  let lastError: any = null;
+
+  // Try up to 3 times
+  for (let attempt = 1; attempt <= 3; attempt++) {
+
+    try {
+
+      console.log(`Anti-spoof attempt ${attempt}/3`);
+
+      const controller = new AbortController();
+
+      const timeout = setTimeout(() => {
+        controller.abort();
+      }, 120000);
+
+      const response = await fetch(url, {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           image,
         }),
+
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      const responseText = await response.text();
+
+      console.log(
+        "Python Status:",
+        response.status
+      );
+
+      console.log(
+        "Python Content-Type:",
+        response.headers.get("content-type")
+      );
+
+      console.log(
+        "Python Response:",
+        responseText.substring(0, 1000)
+      );
+
+      // Python/Render returned an HTTP error
+      if (!response.ok) {
+
+        lastError = new Error(
+          `Python service returned HTTP ${response.status}`
+        );
+
+        console.log(
+          `Attempt ${attempt} failed`
+        );
+
+        if (attempt < 3) {
+          await new Promise(resolve =>
+            setTimeout(resolve, 3000)
+          );
+        }
+
+        continue;
       }
-    );
 
-    const responseText = await response.text();
+      let result: any;
 
-    console.log(
-      "Python Status:",
-      response.status
-    );
+      try {
 
-    console.log(
-      "Python Response:",
-      responseText
-    );
+        result = JSON.parse(responseText);
 
-    let result: any;
+      } catch {
 
-    try {
-      result = JSON.parse(responseText);
-    } catch {
-      throw new Error(
-        `Invalid response from Python: ${responseText}`
+        lastError = new Error(
+          "Python returned an invalid JSON response"
+        );
+
+        if (attempt < 3) {
+          await new Promise(resolve =>
+            setTimeout(resolve, 3000)
+          );
+        }
+
+        continue;
+      }
+
+      console.log(
+        "Anti-spoof result:",
+        result
       );
-    }
 
-    if (!response.ok) {
-      throw new Error(
-        result?.message ||
-        `Python service returned ${response.status}`
+      return result;
+
+    } catch (error: any) {
+
+      console.error(
+        `Anti-spoof attempt ${attempt} failed:`,
+        error
       );
+
+      lastError = error;
+
+      if (attempt < 3) {
+        await new Promise(resolve =>
+          setTimeout(resolve, 3000)
+        );
+      }
     }
-
-    return result;
-
-  } catch (error: any) {
-
-    console.error(
-      "Anti-spoof request failed:",
-      error
-    );
-
-    throw new Error(
-      error?.message ||
-      "Unable to connect to anti-spoof service"
-    );
   }
+
+  throw new Error(
+    lastError?.message ||
+    "Unable to connect to anti-spoof service"
+  );
 };
