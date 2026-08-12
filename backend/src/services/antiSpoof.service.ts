@@ -1,94 +1,74 @@
-import { spawn } from "child_process";
-import path from "path";
-import fs from "fs";
-
-export const checkSpoof = (
+export const checkSpoof = async (
   image: string
 ): Promise<any> => {
-  return new Promise((resolve, reject) => {
+  try {
+    const pythonUrl = process.env.ANTI_SPOOF_URL;
 
-    const pythonPath = path.resolve(
-      process.cwd(),
-      "python",
-      "anti_spoof.py"
-    );
-
-    console.log("Python File:", pythonPath);
-
-    if (!fs.existsSync(pythonPath)) {
-      reject(new Error(`Python file not found: ${pythonPath}`));
-      return;
+    if (!pythonUrl) {
+      throw new Error(
+        "ANTI_SPOOF_URL is not configured"
+      );
     }
 
-    // Windows: py -3.11
-    // Render/Linux: python3
-    const pythonCommand =
-      process.platform === "win32" ? "py" : "python3";
-
-    const pythonArgs =
-      process.platform === "win32"
-        ? ["-3.11", pythonPath]
-        : [pythonPath];
-
-    console.log("Python Command:", pythonCommand);
-    console.log("Python Args:", pythonArgs);
-
-    const python = spawn(pythonCommand, pythonArgs);
-
-    let output = "";
-    let error = "";
-
-    console.log("Sending image to Python...");
+    console.log("===== ANTI SPOOF REQUEST =====");
+    console.log("Python Service:", pythonUrl);
+    console.log("Image exists:", !!image);
     console.log("Image length:", image?.length);
 
-    python.stdin.write(
-      JSON.stringify({
-        image,
-      })
+    const response = await fetch(
+      `${pythonUrl}/anti-spoof`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image,
+        }),
+      }
     );
 
-    python.stdin.end();
+    const responseText = await response.text();
 
-    python.stdout.on("data", (data) => {
-      output += data.toString();
-    });
+    console.log(
+      "Python Status:",
+      response.status
+    );
 
-    python.stderr.on("data", (data) => {
-      error += data.toString();
-    });
+    console.log(
+      "Python Response:",
+      responseText
+    );
 
-    python.on("error", (err) => {
-      console.error("Python spawn error:", err);
-      reject(err);
-    });
+    let result: any;
 
-    python.on("close", (code) => {
-      console.log("Python Exit Code:", code);
-      console.log("Python Output:", output);
-      console.log("Python Error:", error);
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      throw new Error(
+        `Invalid response from Python: ${responseText}`
+      );
+    }
 
-      if (code !== 0) {
-        reject(
-          new Error(
-            error || `Python process exited with code ${code}`
-          )
-        );
-        return;
-      }
+    if (!response.ok) {
+      throw new Error(
+        result?.message ||
+        `Python service returned ${response.status}`
+      );
+    }
 
-      try {
-        const lines = output
-          .trim()
-          .split(/\r?\n/)
-          .filter((line) => line.trim() !== "");
+    return result;
 
-        const jsonLine = lines[lines.length - 1];
+  } catch (error: any) {
 
-        resolve(JSON.parse(jsonLine));
-      } catch (err) {
-        console.log("Raw Python Output:\n", output);
-        reject(new Error("Invalid JSON returned from Python"));
-      }
-    });
-  });
+    console.error(
+      "Anti-spoof request failed:",
+      error
+    );
+
+    throw new Error(
+      error?.message ||
+      "Unable to connect to anti-spoof service"
+    );
+  }
 };
