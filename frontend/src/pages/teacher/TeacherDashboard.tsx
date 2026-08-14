@@ -36,18 +36,97 @@ export default function TeacherDashboard() {
   const [error, setError] = useState("");
 
   const getLocation = (): Promise<GeolocationPosition> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject("Geolocation not supported");
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocation not supported"));
+      return;
+    }
+
+    let bestPosition: GeolocationPosition | null = null;
+    let watchId: number | null = null;
+
+    const startTime = Date.now();
+    const maxWaitTime = 15000;
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const accuracy = position.coords.accuracy;
+
+        console.log("📍 GPS Reading:");
+        console.log("Latitude:", position.coords.latitude);
+        console.log("Longitude:", position.coords.longitude);
+        console.log("Accuracy:", accuracy, "meters");
+
+        // Keep the most accurate reading
+        if (
+          !bestPosition ||
+          accuracy < bestPosition.coords.accuracy
+        ) {
+          bestPosition = position;
+
+          console.log(
+            "✅ Best GPS so far:",
+            accuracy,
+            "meters"
+          );
+        }
+
+        // Good GPS reading
+        if (accuracy <= 20) {
+          console.log(
+            "🎯 Good GPS found:",
+            accuracy,
+            "meters"
+          );
+
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+          }
+
+          resolve(position);
+          return;
+        }
+
+        // Stop after 15 seconds
+        if (Date.now() - startTime >= maxWaitTime) {
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+          }
+
+          if (bestPosition) {
+            console.log(
+              "⚠️ Using best available GPS:",
+              bestPosition.coords.accuracy,
+              "meters"
+            );
+
+            resolve(bestPosition);
+          } else {
+            reject(
+              new Error(
+                "Unable to get GPS location"
+              )
+            );
+          }
+        }
+      },
+      (error) => {
+        console.error("❌ GPS Error:", error);
+
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+
+        reject(error);
+      },
+      {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 15000,
         maximumAge: 0,
-      });
-    });
-  };
+      }
+    );
+  });
+};
 
   const startAttendance = async () => {
     setLoading(true);

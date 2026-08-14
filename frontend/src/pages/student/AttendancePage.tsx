@@ -257,39 +257,79 @@ export default function AttendancePage() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      resolve,
+    let bestPosition: GeolocationPosition | null = null;
+    let watchId: number | null = null;
+
+    const startTime = Date.now();
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const accuracy = position.coords.accuracy;
+
+        console.log("📍 GPS Reading:");
+        console.log("Latitude:", position.coords.latitude);
+        console.log("Longitude:", position.coords.longitude);
+        console.log("Accuracy:", accuracy, "meters");
+
+        // Save the most accurate reading
+        if (
+          !bestPosition ||
+          accuracy < bestPosition.coords.accuracy
+        ) {
+          bestPosition = position;
+
+          console.log(
+            "✅ Best GPS:",
+            accuracy,
+            "meters"
+          );
+        }
+
+        // Good accuracy → use immediately
+        if (accuracy <= 20) {
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+          }
+
+          console.log(
+            "🎯 GPS accepted:",
+            accuracy,
+            "meters"
+          );
+
+          resolve(position);
+          return;
+        }
+
+        // After 15 seconds, use the best reading available
+        if (Date.now() - startTime >= 15000) {
+          if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+          }
+
+          if (bestPosition) {
+            console.log(
+              "⚠️ Using best GPS available:",
+              bestPosition.coords.accuracy,
+              "meters"
+            );
+
+            resolve(bestPosition);
+          } else {
+            reject(
+              new Error("Unable to get GPS location.")
+            );
+          }
+        }
+      },
       (error) => {
         console.error("❌ LOCATION ERROR:", error);
 
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            reject(
-              new Error(
-                "Location permission denied. Please allow location access."
-              )
-            );
-            break;
-
-          case error.POSITION_UNAVAILABLE:
-            reject(
-              new Error(
-                "Location is currently unavailable. Please try again."
-              )
-            );
-            break;
-
-          case error.TIMEOUT:
-            reject(
-              new Error(
-                "Location request timed out. Please enable GPS and try again."
-              )
-            );
-            break;
-
-          default:
-            reject(new Error("Unable to get your location."));
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
         }
+
+        reject(error);
       },
       {
         enableHighAccuracy: true,
