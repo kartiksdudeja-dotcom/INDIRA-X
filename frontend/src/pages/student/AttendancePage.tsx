@@ -323,11 +323,29 @@ export default function AttendancePage() {
         }
       },
       (error) => {
-        (error) => {
   console.error("❌ LOCATION ERROR");
   console.error("GPS Error Code:", error.code);
   console.error("GPS Error Message:", error.message);
   console.error("GPS Full Error:", error);
+
+  // Send actual GPS error to backend
+  fetch(`${import.meta.env.VITE_API_URL}/attendance/gps-error`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      code: error.code,
+      message: error.message,
+      error: "GeolocationPositionError",
+      userAgent: navigator.userAgent,
+    }),
+  }).catch((err) => {
+    console.error(
+      "Failed to send GPS error to backend:",
+      err
+    );
+  });
 
   if (watchId !== null) {
     navigator.geolocation.clearWatch(watchId);
@@ -343,18 +361,12 @@ export default function AttendancePage() {
       "Location unavailable. Please turn ON phone Location/GPS and try again.";
   } else if (error.code === 3) {
     message =
-      "GPS took too long to respond. Please move near a window/open area and try again.";
+      "GPS took too long to respond. Please try again.";
   }
 
   reject(new Error(message));
-}
+},
 
-        if (watchId !== null) {
-          navigator.geolocation.clearWatch(watchId);
-        }
-
-        reject(error);
-      },
       {
   enableHighAccuracy: true,
   timeout: 30000,

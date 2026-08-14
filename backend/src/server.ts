@@ -217,6 +217,21 @@ app.post("/api/classes", async (req, res) => {
   res.status(201).json(classItem);
 });
 
+app.post("/api/attendance/gps-error", async (req, res) => {
+  console.log("========== GPS ERROR FROM PHONE ==========");
+  console.log("GPS Code:", req.body.code);
+  console.log("GPS Message:", req.body.message);
+  console.log("GPS Error:", req.body.error);
+  console.log("User Agent:", req.body.userAgent);
+  console.log("Timestamp:", new Date().toISOString());
+  console.log("==========================================");
+
+  res.json({
+    success: true,
+    message: "GPS error received by backend",
+  });
+});
+
 async function startServer() {
   try {
     console.log("1. Starting server");
