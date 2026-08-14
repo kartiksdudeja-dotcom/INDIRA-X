@@ -19,6 +19,8 @@ def health():
 
 @app.post("/anti-spoof")
 def anti_spoof():
+    print("🔥 ANTI-SPOOF ENDPOINT HIT", flush=True)
+     
     try:
         data = request.get_json(silent=True)
 
