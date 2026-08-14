@@ -286,7 +286,7 @@ export default function AttendancePage() {
         }
 
         // Good accuracy → use immediately
-        if (accuracy <= 20) {
+        if (accuracy <= 50) {
           if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
           }
@@ -323,7 +323,31 @@ export default function AttendancePage() {
         }
       },
       (error) => {
-        console.error("❌ LOCATION ERROR:", error);
+        (error) => {
+  console.error("❌ LOCATION ERROR");
+  console.error("GPS Error Code:", error.code);
+  console.error("GPS Error Message:", error.message);
+  console.error("GPS Full Error:", error);
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+  }
+
+  let message = "Unable to get your location.";
+
+  if (error.code === 1) {
+    message =
+      "Location permission denied. Please allow location access for this website.";
+  } else if (error.code === 2) {
+    message =
+      "Location unavailable. Please turn ON phone Location/GPS and try again.";
+  } else if (error.code === 3) {
+    message =
+      "GPS took too long to respond. Please move near a window/open area and try again.";
+  }
+
+  reject(new Error(message));
+}
 
         if (watchId !== null) {
           navigator.geolocation.clearWatch(watchId);
@@ -332,10 +356,10 @@ export default function AttendancePage() {
         reject(error);
       },
       {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
+  enableHighAccuracy: true,
+  timeout: 30000,
+  maximumAge: 0,
+}
     );
   });
 
