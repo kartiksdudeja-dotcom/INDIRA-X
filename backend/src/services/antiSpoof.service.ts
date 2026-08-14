@@ -17,7 +17,6 @@ export const checkSpoof = async (
 
   let lastError: any = null;
 
-  // Try up to 3 times
   for (let attempt = 1; attempt <= 3; attempt++) {
 
     try {
@@ -30,89 +29,118 @@ export const checkSpoof = async (
         controller.abort();
       }, 120000);
 
-      const response = await fetch(url, {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          image,
-        }),
-
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      const responseText = await response.text();
-
-      console.log(
-        "Python Status:",
-        response.status
-      );
-
-      console.log(
-        "Python Content-Type:",
-        response.headers.get("content-type")
-      );
-
-      console.log(
-        "Python Response:",
-        responseText.substring(0, 1000)
-      );
-
-      // Python/Render returned an HTTP error
-     if (!response.ok) {
-  console.log(`Python service returned HTTP ${response.status}`);
-
-  if (response.status === 429) {
-    throw new Error(
-      "Python anti-spoof service is temporarily rate limited (HTTP 429)"
-    );
-  }
-
-  lastError = new Error(
-    `Python service returned HTTP ${response.status}`
-  );
-
-  if (attempt < 3) {
-    await new Promise(resolve =>
-      setTimeout(resolve, 3000)
-    );
-  }
-
-  continue;
-}
-
-      let result: any;
-
       try {
 
-        result = JSON.parse(responseText);
+        const response = await fetch(url, {
+          method: "POST",
 
-      } catch {
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-        lastError = new Error(
-          "Python returned an invalid JSON response"
+          body: JSON.stringify({
+            image,
+          }),
+
+          signal: controller.signal,
+        });
+
+        const responseText = await response.text();
+
+        console.log(
+          "Python Status:",
+          response.status
         );
 
-        if (attempt < 3) {
-          await new Promise(resolve =>
-            setTimeout(resolve, 3000)
+        console.log(
+          "Python Content-Type:",
+          response.headers.get("content-type")
+        );
+
+        console.log(
+          "Python Response:",
+          responseText.substring(0, 1000)
+        );
+
+        // ============================
+        // HTTP 429
+        // ============================
+
+        if (response.status === 429) {
+
+          console.error(
+            "🚨 Python service returned HTTP 429"
+          );
+
+          throw new Error(
+            "Python anti-spoof service is temporarily rate limited (HTTP 429)"
           );
         }
 
-        continue;
+        // ============================
+        // Other HTTP errors
+        // ============================
+
+        if (!response.ok) {
+
+          lastError = new Error(
+            `Python service returned HTTP ${response.status}`
+          );
+
+          console.log(
+            `Attempt ${attempt} failed`
+          );
+
+          if (attempt < 3) {
+
+            await new Promise(resolve =>
+              setTimeout(resolve, 3000)
+            );
+
+          }
+
+          continue;
+        }
+
+        // ============================
+        // Parse JSON
+        // ============================
+
+        let result: any;
+
+        try {
+
+          result = JSON.parse(responseText);
+
+        } catch {
+
+          lastError = new Error(
+            "Python returned an invalid JSON response"
+          );
+
+          if (attempt < 3) {
+
+            await new Promise(resolve =>
+              setTimeout(resolve, 3000)
+            );
+
+          }
+
+          continue;
+        }
+
+        console.log(
+          "Anti-spoof result:",
+          result
+        );
+
+        return result;
+
+      } finally {
+
+        clearTimeout(timeout);
+
       }
-
-      console.log(
-        "Anti-spoof result:",
-        result
-      );
-
-      return result;
 
     } catch (error: any) {
 
@@ -121,12 +149,26 @@ export const checkSpoof = async (
         error
       );
 
+      // =================================
+      // IMPORTANT:
+      // NEVER retry HTTP 429
+      // =================================
+
+      if (
+        error?.message?.includes("HTTP 429")
+      ) {
+
+        throw error;
+      }
+
       lastError = error;
 
       if (attempt < 3) {
+
         await new Promise(resolve =>
           setTimeout(resolve, 3000)
         );
+
       }
     }
   }
