@@ -64,24 +64,27 @@ export const checkSpoof = async (
       );
 
       // Python/Render returned an HTTP error
-      if (!response.ok) {
+     if (!response.ok) {
+  console.log(`Python service returned HTTP ${response.status}`);
 
-        lastError = new Error(
-          `Python service returned HTTP ${response.status}`
-        );
+  if (response.status === 429) {
+    throw new Error(
+      "Python anti-spoof service is temporarily rate limited (HTTP 429)"
+    );
+  }
 
-        console.log(
-          `Attempt ${attempt} failed`
-        );
+  lastError = new Error(
+    `Python service returned HTTP ${response.status}`
+  );
 
-        if (attempt < 3) {
-          await new Promise(resolve =>
-            setTimeout(resolve, 3000)
-          );
-        }
+  if (attempt < 3) {
+    await new Promise(resolve =>
+      setTimeout(resolve, 3000)
+    );
+  }
 
-        continue;
-      }
+  continue;
+}
 
       let result: any;
 
